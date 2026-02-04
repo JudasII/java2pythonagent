@@ -1,3 +1,5 @@
+import json
+
 import requests
 from typing import List, Dict, Any
 
@@ -20,17 +22,20 @@ class OllamaModel:
         temperature: float = 0.2,
         max_tokens: int = 1024,
         timeout: int = 60,
+        stream: bool = True,
     ):
         """
         Initialize the Ollama model client.
 
         Args:
+            stream: whether to show or not the trace of the response( debug mode )
             model_name: Name of the Ollama model to use (e.g. "qwen3:4b").
             base_url: Base URL of the Ollama server.
             temperature: Sampling temperature for generation.
             max_tokens: Maximum number of tokens to generate (mapped to Ollama's `num_predict`).
             timeout: HTTP request timeout in seconds.
         """
+        self.stream = stream
         self.model_name = model_name
         self.base_url = base_url.rstrip("/")
         self.temperature = temperature
@@ -78,12 +83,38 @@ class OllamaModel:
             response = requests.post(
                 f"{self.base_url}/api/chat",
                 json=payload,
+                stream=self.stream,
                 timeout=self.timeout,
             )
-            response.raise_for_status()
+
+            if self.stream:
+                return self._parse_stream(response)
+            else:
+                return self._parse_non_stream(response)
         except requests.RequestException as e:
             raise RuntimeError(f"Ollama request failed: {e}")
 
-        data = response.json()
+    def _parse_stream(self, response) -> str:
+        full_text = ""
 
+        for line in response.iter_lines(decode_unicode=True):
+            if not line:
+                continue
+
+            print("RAW:", line)
+
+            chunk = json.loads(line)
+
+            if "message" in chunk:
+                content = chunk["message"].get("content")
+                if content:
+                    full_text += content + "\n\n"
+
+            if chunk.get("done"):
+                break
+
+        return full_text
+
+    def _parse_non_stream(self, response) -> str:
+        data = response.json()
         return data["message"]["content"]
