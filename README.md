@@ -1,121 +1,113 @@
 # java2pythonagent
 this is a simple agent that takes java code and transforms it into python
 ---
+# Version 0.5 — Observability and Contract Enforcement
 
-# Version 0 — Initial Exploration
+This branch is a stepping stone to prepare for **V1** of the project.
 
-This branch represents the very first iteration of the project.
+As the analysis progressed, it became clear that there was a missing step between V0 and V1. This step was not a “nice to have” or a polish detail, but a logical and necessary transition. While it initially felt like a big jump, it turned out to be relatively small in terms of implementation, mostly involving better prompting and a few lines of code.
 
-At this stage, the system is intentionally minimal: it is essentially a wrapper around a locally hosted LLM, exposed through two execution paths:
-- a direct LLM call from a Python script
-- a very simple `CodeAgent` built using `smolagents`
-
-The goal of this version is **not** to build a full agent-based system, but to validate the core idea with the smallest possible surface area.
+That is why this version exists as **v0.5**.
 
 ---
 
-## What problem is being explored?
+## Purpose of V0.5
 
-The initial objective is straightforward:
+The main goal of this version is to clearly understand and validate:
 
-> Take a snippet of Java code and return its Python equivalent.
+- How inputs and outputs of the system should look
+- Whether the prompt contract is being properly enforced by the model
+- How the model reasons internally when performing the task
 
-At first glance, this looks like a natural fit for an AI agent that:
-- reasons about the code
-- decides how to translate it
-- handles errors and ambiguity
-
-However, during exploration it became clear that **most of that complexity is unnecessary at this stage**.
+At this stage, correctness, clarity, and observability are more important than automation or orchestration.
 
 ---
 
-## Why this design?
+## Key Focus Areas
 
-A key takeaway early on was learning to distinguish:
-- when an **agent** is actually needed
-- and when a **simple LLM call** is enough
+### 1. Contract validation
 
-For a task like code translation, there are multiple possible approaches:
-- building a complex mapping layer using traditional code
-- using an LLM with a well-defined prompt
-- orchestrating everything with a multi-step agent
+The system now strictly enforces a clear contract:
 
-For Version 0, the simplest option wins.
+- Input: a functional fragment of Java code
+- Output: Python code wrapped inside `<code></code>` tags, or an explicit `ERROR` inside the same tags
 
-This branch intentionally keeps:
-- a **very explicit system prompt**
-- a **thin wrapper around the LLM**
-- and a **minimal agent orchestration**, mostly as an experiment
-
-The agent here does not add intelligence — it merely demonstrates how agent-based orchestration could be layered on top later, once it is actually justified.
+This allows the system to fail fast and explicitly when translation is unsafe or ambiguous, instead of producing misleading output.
 
 ---
 
-## Why two execution paths?
+### 2. Observability over magic
 
-This branch includes two scripts on purpose:
+One of the main learnings of this iteration is that treating the model as a black box is dangerous.
 
-- **Direct LLM call**
-  - The simplest possible interaction
-  - Useful for validating prompts and model behavior
-  - Lowest overhead and easiest to reason about
-
-- **Agent-based execution**
-  - Uses `smolagents.CodeAgent`
-  - Demonstrates how the same prompt can be embedded into an agent workflow
-  - Helps expose limitations, failure modes, and unnecessary complexity early
-
-Having both side by side makes the trade-offs very explicit.
+To address this, the internal reasoning of the model is exposed and inspected. By “cracking open the brain,” we can verify whether the model is reasoning correctly, redundantly, or inefficiently, and make informed decisions before adding more complexity.
 
 ---
 
-## Configuration & Requirements
+## What Changed in This Version
 
-This project relies entirely on **local compute**.
+### Streaming support (configurable)
 
-### Requirements
-- A locally running LLM backend (e.g. Ollama)
-- A downloaded model
+The `stream` parameter is now configurable.
 
-All experiments in this branch were done using:
+This allows:
+- Observing the model’s reasoning step by step
+- Understanding token usage beyond simple input/output counts
+- Detecting silent failures and unexpected behaviors early
 
-- **Model:** `qwen3:4b`  
-  A small, lightweight model that is reasonably capable while remaining friendly to limited hardware.
-
-### Running the project
-1. Start your local LLM backend.
-2. Configure the model name in the script you want to run.
-3. Execute either:
-   - the direct LLM call script, or
-   - the agent-based script.
-
-A system prompt is preloaded, but it is intentionally easy to modify for experimentation.
+Early-stage observability is a deliberate design choice in this version.
 
 ---
 
-## Scope of Version 0
+### New script: `translate_java_to_py`
 
-What this version **does**:
-- validates local LLM integration
-- explores prompt-driven code translation
-- exposes early agent failure modes
-- keeps everything small, observable, and debuggable
+A new script was introduced that performs a very specific task:
 
-What this version **does not attempt**:
-- file I/O
-- tool usage
-- multi-agent communication
-- production-grade reliability
+- Takes a line (or small fragment) of Java code
+- Sends it to the model using the refined prompt
+- Extracts the `<code></code>` output
+- Writes the resulting Python code to a file
 
-Those are explicitly deferred to later versions.
+The read and write process is handled manually using Python I/O.
+
+This is **intentional**.
+
+At this stage, the goal is **not** to explore tools, tool orchestration, or agent autonomy, but to fully understand the shape of the system and its boundaries.
 
 ---
 
-## Next steps
+## Why Tools Are Not Used Yet
 
-Future versions will incrementally introduce:
-- clearer input/output boundaries (e.g. `.java` → `.py`)
-- controlled tool usage
-- stricter contracts between model and code
-- and only then, more sophisticated agent behavior
+Tools are deliberately excluded in this version.
+
+Before delegating responsibilities to an agent, it is necessary to:
+- Clearly understand the I/O cycle
+- Validate the translation contract
+- Observe model behavior under controlled conditions
+
+Introducing tools too early would hide important details behind abstractions and reduce visibility.
+
+---
+
+## Outcome
+
+By the end of V0.5, the full cycle is explicit and observable:
+
+1. Prompt and Java code are loaded
+2. The model processes the input
+3. Reasoning can be inspected (when streaming is enabled)
+4. The output is validated against the contract
+5. The resulting Python code is written to a file
+
+This closes the loop and provides a clear mental and technical model of how the future agentic system should operate.
+
+---
+
+## What This Enables for V1
+
+With V0.5 complete, the project is now ready to move into V1, where:
+
+- Responsibility for I/O can start shifting to the agent
+- Tools can be introduced with clear intent
+- Decisions can be made based on observed behavior, not assumptions
 
